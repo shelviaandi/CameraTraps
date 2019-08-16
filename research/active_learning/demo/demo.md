@@ -8,7 +8,7 @@ Conservation researchers often want to use these data to answer questions about 
 
 <img src="demo3.gif" width=50%><img src="demo3.jpg" width=50%>
 
-This first step can be handled reasonably well by first applying an object detector to the camera trap data. We can use the predicted bounding boxes to crop the camera traps around detected animals.
+This first step can be handled reasonably well by first applying an object detector to the camera trap data. We can use the predicted bounding boxes to crop the camera trap images around detected animals.
 
 <img src="demo4a.jpg" width=32%>
 <img src="demo4b.jpg" width=32%>
