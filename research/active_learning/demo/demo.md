@@ -6,13 +6,13 @@ Camera traps are gaining popularity as a tool for conducting widespread and long
 ## Getting Only Images with Animals
 Conservation researchers often want to use these data to answer questions about the abundance or characteristics of the animals detected in the images. To do this, it would be helpful to first discard empty images. For example, a red fox appears in only the first frame of this image sequence:
 
-<img src="demo3.gif" width=50%><img src="demo3.png" width=50%>
+<img src="demo3.gif" width=50%><img src="demo3.jpg" width=50%>
 
 This first step can be handled reasonably well by first applying an object detector to the camera trap data. We can use the predicted bounding boxes to crop the camera traps around detected animals.
 
-<img src="demo4a.png" width=32%>
-<img src="demo4b.png" width=32%>
-<img src="demo4c.png" width=32%>
+<img src="demo4a.jpg" width=32%>
+<img src="demo4b.jpg" width=32%>
+<img src="demo4c.jpg" width=32%>
 
 ## Identifying Species in the Dataset
 
