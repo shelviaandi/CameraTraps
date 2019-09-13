@@ -48,8 +48,6 @@ target_db = PostgresqlDatabase(DB_NAME, user=USER, password=PASSWORD, host='loca
 db_proxy.initialize(target_db)
 target_db.create_tables([Info, Category, Image, Detection])
 
-
-
 # Populate Info table
 info_name = args.crop_dir
 info_desc = 'Active learning for classification database of cropped images to classify via active learning (target dataset).'
@@ -66,7 +64,6 @@ except:
 
 # Populate Category table
 ## For now, we have a predefined list of species we expect to see in the camera trap database (e.g. maybe from a quick look through the images)
-## TODO: allow user to update the class list through the labeling tool UI as they see different species
 class_list = ['empty'] + [cname.lower() for cname in open(args.class_list, 'r').read().splitlines()]
 for i, cat in enumerate(class_list):
     existing_cat_entries = Category.select().where(Category.name == cat)

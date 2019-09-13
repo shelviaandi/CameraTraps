@@ -1,4 +1,4 @@
-import argparse, os, random, sys, time, warnings
+import argparse, csv, os, random, sys, time, warnings
 from shutil import copy
 
 import numpy as np
@@ -72,10 +72,11 @@ parser.add_argument('-b', '--batch_size', default=256, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('-N', '--active_batch', default=100, type=int,
                     help='Number of samples to have the user label between training classifier.')
-parser.add_argument('-A', '--active_budget', default=5000, type=int,
+parser.add_argument('-A', '--active_budget', default=10000, type=int,
                     help='Maximum number of samples to get the user to label.')
 parser.add_argument('--K', default=5, type=int,
                     help='number of clusters')
+parser.add_argument('--random_seed', type=int, default=1234, help='Random number seed.')
 
 
 
@@ -117,8 +118,13 @@ def finetune_embedding(model, loss_type, train_dataset, P, K, epochs):
 
 def main():
     args = parser.parse_args()
-    
-    # Initialize Database
+
+    random.seed(args.random_seed)
+    np.random.seed(args.random_seed)
+
+    #--------------------------------------------------#
+    # INITIALIZE THE DATABASE
+    #--------------------------------------------------#
     ## database connection credentials
     DB_NAME = args.db_name
     USER = args.db_user
@@ -130,8 +136,9 @@ def main():
     db_proxy.initialize(target_db)
     print("connected")
 
-
-    # Load the saved embedding model
+    #--------------------------------------------------#
+    # LOAD THE SAVED EMBEDDING MODEL
+    #--------------------------------------------------#
     checkpoint = load_checkpoint(args.base_model)
     if args.experiment_name == '':
         args.experiment_name = "experiment_%s_%s"%(checkpoint['loss_type'], args.strategy)
@@ -142,50 +149,74 @@ def main():
         embedding_net = SoftmaxNet(checkpoint['arch'], checkpoint['feat_dim'], checkpoint['num_classes'], False)
     else:
         embedding_net = NormalizedEmbeddingNet(checkpoint['arch'], checkpoint['feat_dim'], False)
-
     model = torch.nn.DataParallel(embedding_net).cuda()
     model.load_state_dict(checkpoint['state_dict'])
 
-    # dataset_query = Detection.select().limit(5)
-    dataset_query = Detection.select(Detection.image_id, Oracle.label, Detection.kind).join(Oracle).order_by(fn.random()).limit(args.db_query_limit) ## TODO: should this really be order_by random?
+    #--------------------------------------------------#
+    # SAMPLE THE DATASET FROM THE DATABASE
+    #--------------------------------------------------#
+    dataset_query = Detection.select(Detection.image_id, Oracle.label, Detection.kind).join(Oracle).where(Oracle.label!=0).order_by(fn.random()).limit(args.db_query_limit) ## TODO: should this really be order_by random?
     dataset = SQLDataLoader(args.crop_dir, query=dataset_query, is_training=False, kind=DetectionKind.ModelDetection.value, num_workers=8, limit=args.db_query_limit)
-    dataset.updateEmbedding(model)
+    # dataset.updateEmbedding(model)
     # plot_embedding_images(dataset.em[:], np.asarray(dataset.getlabels()) , dataset.getpaths(), {})
     # plot_embedding_images(dataset.em[:], np.asarray(dataset.getalllabels()) , dataset.getallpaths(), {})
     
-    # Random examples to start
-    #random_ids = np.random.choice(dataset.current_set, 1000, replace=False).tolist()
+    #--------------------------------------------------#
+    # DO INITIAL EMBEDDING FINE-TUNING ON RANDOM SAMPLES
+    #--------------------------------------------------#
+    initial_finetune_budget = 300
+    random_ids = np.random.choice(dataset.current_set, initial_finetune_budget, replace=False).tolist()
     #random_ids = selectSamples(dataset.em[dataset.current_set], dataset.current_set, 2000)
-    #print(random_ids)
-    # Move Records
-    #moveRecords(dataset, DetectionKind.ModelDetection.value, DetectionKind.UserDetection.value, random_ids)
-
-    # #print([len(x) for x in dataset.set_indices])
-    # # Finetune the embedding model
-    # #dataset.set_kind(DetectionKind.UserDetection.value)
-    # #dataset.train()
-    # #train_dataset = SQLDataLoader(trainset_query, os.path.join(args.run_data, 'crops'), is_training= True)
-    # #finetune_embedding(model, checkpoint['loss_type'], dataset, 32, 4, 100)
-    # #save_checkpoint({
-    # #        'arch': model.arch,
-    # #        'state_dict': model.state_dict(),
-    # #        'optimizer' : optimizer.state_dict(),
-    # #        'loss_type' : loss_type,
-    # #        }, False, "%s%s_%s_%04d.tar"%('finetuned', loss_type, model.arch, len(dataset.set_indices[DetectionKind.UserDetection.value])))
-
-    dataset.embedding_mode()
+    moveRecords(dataset, DetectionKind.ModelDetection.value, DetectionKind.UserDetection.value, random_ids)
+    dataset.set_kind(DetectionKind.UserDetection.value)
     dataset.train()
+    finetune_embedding(model, checkpoint['loss_type'], dataset, 10, 4, 100)
+    #save_checkpoint({
+    #        'arch': model.arch,
+    #        'state_dict': model.state_dict(),
+    #        'optimizer' : optimizer.state_dict(),
+    #        'loss_type' : loss_type,
+    #        }, False, "%s%s_%s_%04d.tar"%('finetuned', loss_type, model.arch, len(dataset.set_indices[DetectionKind.UserDetection.value])))
+    dataset.set_kind(DetectionKind.ModelDetection.value)
+    dataset.updateEmbedding(model)
+    dataset.embedding_mode()
     sampler = get_AL_sampler(args.strategy)(dataset.em, dataset.getalllabels(), 12)
 
+    #--------------------------------------------------#
+    # TRAIN INITIAL CLASSIFIER ON LABELED SAMPLES
+    #--------------------------------------------------#
     kwargs = {}
     kwargs["N"] = args.active_batch
     kwargs["already_selected"] = dataset.set_indices[DetectionKind.UserDetection.value]
     kwargs["model"] = MLPClassifier(alpha=0.0001)
 
+    dataset.set_kind(DetectionKind.UserDetection.value)
+    X_train = dataset.em[dataset.current_set]
+    y_train = np.asarray(dataset.getlabels())
+
+    kwargs["model"].fit(X_train, y_train)
+    numLabeled = len(dataset.set_indices[DetectionKind.UserDetection.value])
+    joblib.dump(kwargs["model"], "%s/%s_%04d.skmodel"%(args.experiment_name, 'classifier', numLabeled))
+        
+    # Test on the samples that have not been labeled
+    dataset.set_kind(DetectionKind.ModelDetection.value)
+    dataset.embedding_mode()
+    X_test = dataset.em[dataset.current_set]
+    y_test = np.asarray(dataset.getlabels())
+    accuracy_score = kwargs["model"].score(X_test, y_test)
+    print("Accuracy", accuracy_score)
+
+    #--------------------------------------------------#
+    # SAVE ACCURACY TRACE
+    #--------------------------------------------------#
+    accuracy_trace_csvfile = open("%s/init_finetune_%04d_%s.csv"%(args.experiment_name, initial_finetune_budget, args.strategy), 'w')
+    accuracy_trace_writer = csv.writer(accuracy_trace_csvfile)
+    accuracy_trace_writer.writerow([numLabeled, accuracy_score])
+
     print("Start the active learning loop")
     sys.stdout.flush()
     numLabeled = len(dataset.set_indices[DetectionKind.UserDetection.value])
-    while numLabeled <= args.active_budget:
+    while numLabeled < args.active_budget:
         print([len(x) for x in dataset.set_indices])
         sys.stdout.flush()
 
@@ -212,12 +243,17 @@ def main():
         dataset.embedding_mode()
         X_test = dataset.em[dataset.current_set]
         y_test = np.asarray(dataset.getlabels())
-        print("Accuracy", kwargs["model"].score(X_test, y_test))
-        
+        accuracy_score = kwargs["model"].score(X_test, y_test)
+        print("Accuracy", accuracy_score)
+        accuracy_trace_csvfile = open("%s/init_finetune_%04d_%s.csv"%(args.experiment_name, initial_finetune_budget, args.strategy), 'a')
+        accuracy_trace_writer = csv.writer(accuracy_trace_csvfile)
+        accuracy_trace_writer.writerow([numLabeled, accuracy_score])
+
         sys.stdout.flush()
         if numLabeled % 2000 == 1000:
             dataset.set_kind(DetectionKind.UserDetection.value)
-            finetune_embedding(model, checkpoint['loss_type'], dataset, 10, 4, 100 if numLabeled == 1000 else 50)
+            # finetune_embedding(model, checkpoint['loss_type'], dataset, 10, 4, 100 if numLabeled == 1000 else 50)
+            finetune_embedding(model, checkpoint['loss_type'], dataset, 10, 4, 50)
             save_checkpoint({
             'arch': checkpoint['arch'],
             'state_dict': model.state_dict(),

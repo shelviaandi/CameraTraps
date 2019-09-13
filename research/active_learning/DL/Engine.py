@@ -222,7 +222,7 @@ class Engine():
 
     def embedding_one_batch(self, input, iter_num):
         """
-        Use engine model for evaluation to get imbedding features for a batch of input images.
+        Use engine model for evaluation to get embedding features for a batch of input images.
         """
         with torch.no_grad():
             input = input.cuda(non_blocking=True)

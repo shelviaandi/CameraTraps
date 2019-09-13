@@ -62,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--db_name', type=str, default='missouricameratraps', help='Name of Postgres DB with target dataset tables.')
     parser.add_argument('--db_user', type=str, default=None, help='Name of user accessing Postgres DB.')
     parser.add_argument('--db_password', type=str, default=None, help='Password of user accessing Postgres DB.')
-    parser.add_argument('--db_query_limit', default=3000, type=int, help='Maximum number of records to read from the Postgres DB.')
+    parser.add_argument('--db_query_limit', default=1000, type=int, help='Maximum number of records to read from the Postgres DB.')
     parser.add_argument('--crop_dir', type=str, required=True, help='Path to directory containing cropped images to display.')
     parser.add_argument('--class_list', type=str, required=True, help='Path to .txt file containing classes in dataset.')
     parser.add_argument('--checkpoint_dir', type=str, required=True, help='Path to directory where checkpoints will be stored.')
@@ -202,11 +202,57 @@ if __name__ == '__main__':
     def get_class_list():
         data = bottle.request.json
         class_list = [cname for cname in open(args.class_list, 'r').read().splitlines()]
-        data['class_list'] = class_list
+        data['class_list'] = sorted(class_list)
         bottle.response.content_type = 'application/json'
         bottle.response.status = 200
         return json.dumps(data)
 
+    @webUIapp.route('/addNewLabel', method='POST')
+    def add_new_label():
+        data = bottle.request.json
+        print('<<<<<<<adding %s as new class>>>>>'%data['new_label_text'])
+        class_list = [cname for cname in open(args.class_list, 'r').read().splitlines()]
+        print('classes in class list .txt file:', class_list)
+        
+        label_already_in_list = False # make sure the new label is not already in the class list
+        class_list_lower = [cname.lower() for cname in class_list]
+        if data['new_label_text'].lower() not in class_list_lower:
+            print('label was not found in list')
+            # add the new label to the class list and sort
+            class_list_lower.append(data['new_label_text'].lower())
+            class_list.append(data['new_label_text'].title())
+            data['class_list'] = sorted(class_list)
+
+            # update the class list .txt file
+            with open(args.class_list, 'w') as outfile:
+                for cname in class_list:
+                    outfile.write(cname+'\n')
+
+            # TODO: add the new class to the database Category table
+            existing_cat_entries = Category.select()
+            print(existing_cat_entries)
+            existing_cat_names = [ce.name for ce in existing_cat_entries]
+            print(existing_cat_names)
+            existing_cat_ids = [ce.id for ce in existing_cat_entries]
+            print(existing_cat_ids)
+            for cat in ['empty']+class_list_lower:
+                if cat not in existing_cat_names:
+                    cat_entry = Category.create(id=max(existing_cat_ids)+1, name=cat)
+                    cat_entry.save()
+
+
+            # return new class list to the webUI app
+            data['label_already_in_list'] = label_already_in_list
+            bottle.response.content_type = 'application/json'
+            bottle.response.status = 200
+            return json.dumps(data)
+        else:
+            print('label was already in list!')
+            label_already_in_list = True
+            data['label_already_in_list'] = label_already_in_list
+            bottle.response.content_type = 'application/json'
+            bottle.response.status = 200
+            return json.dumps(data)
 
     @webUIapp.route('/refreshImagesToDisplay', method='POST')
     def refresh_images_to_display():
@@ -547,6 +593,7 @@ if __name__ == '__main__':
         data = bottle.request.json
         
         image_src = data['img_src']
+        print('Sequence query image:\n%s'%image_src)
         
         matching_image_entries = (Image
                                 .select(Image.seq_id, Image.seq_num_frames, Image.frame_num)
@@ -559,11 +606,13 @@ if __name__ == '__main__':
                                 .where((Image.seq_id == mie.seq_id))
                                 .order_by(Image.frame_num))
                 image_sequence = sorted(list(set([i.source_file_name for i in images_in_seq])))
+                print('Full sequence:\n'+'\n'.join(image_sequence))
                 if len(image_sequence) > 10:
                     minidx = max(mie.frame_num - 4, 0)
                     maxidx = min(mie.frame_num + 4, len(image_sequence))
                     image_sequence = image_sequence[minidx:maxidx+1]
                 data['image_sequence'] = image_sequence
+                print('Returned sequence:\n'+'\n'.join(image_sequence))
             data['success_status'] = True
         except:
             data['success_status'] = False
@@ -571,5 +620,6 @@ if __name__ == '__main__':
         bottle.response.content_type = 'application/json'
         bottle.response.status = 200
         return json.dumps(data)
-
+    print('hello world')
     webUIapp.run(**webUIapp_server_kwargs)
+    

@@ -46,7 +46,7 @@ def main():
         ann_catid = ann['category_id']
         ann_catname = coco_categories[ann_catid]
         coco_imgfn_to_catname[ann_imgfn] = ann_catname
-
+        
     # For each detection, use source image path to get class
     counter = 0
     timer = time.time()

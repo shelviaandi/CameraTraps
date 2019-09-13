@@ -158,12 +158,14 @@
                             </a>
                         </div>
                         <div id="label-block" class="card-body collapse show">
-                            <a class="btn btn-primary" style="border:none; color:white; background-color:#00A4EF; width:100%; margin-top:15px; margin-bottom:15px;" onclick="loadImages()">Load More Images</a>
+                            <a class="btn btn-primary" style="border:none; color:white; background-color:#00A4EF; width:100%; margin-top:10px; margin-bottom:30px;" onclick="loadImages()">Load More Images</a>
                             <p class="card-title" style="color:dimgray;">Assign Label:</p>
                             <select id="classification-dropdown" style="width:100%; margin-bottom:10px;" onchange="assignLabelToSelectedImages()">
                                 <option disabled selected="true" value="0">Species...</option>
                                 <option>Empty</option>
                             </select>
+                            <input type="text" id="newLabelText" value="" style="width: 50%; margin-bottom: 40px;">
+                            <a class="btn btn-primary" style="border:none; color:white; background-color:#7FBA00; width:45%; margin-bottom:5px;" onclick="addNewLabel()">Add New Label</a>
                             <a class="btn btn-primary" style="border:none; color:white; background-color:#FFB900; width:100%; margin-bottom:10px;" onclick="trainClassifier()">Train Classifier</a>
                         </div>
                         
@@ -179,8 +181,8 @@
                             <p class="card-text" style="color:dimgray; margin-top:30px;">Predicted Class:</p>
                             <form>
                                 <select id="prediction-dropdown" name="dropdown" style="width:100%;">
-                                    <option disabled>Species...</option>
-                                    <option>All Species</option>
+                                    <!-- <option disabled value="0">Species...</option> -->
+                                    <option selected value = "0">All Species</option>
                                 </select>
                             </form>
                             <a class="btn btn-primary" style="border:none; color:white; background-color:#F25022; width:100%; margin-top:20px; margin-bottom:20px;" onclick="refreshImagesToDisplay()">Apply Selection Criteria</a>
@@ -323,15 +325,56 @@
                     for (i=0; i<data['class_list'].length; i++){
                         dropdownselector.add(new Option(data['class_list'][i]));
                     }
+                    // document.getElementById('classification-dropdown').value = '0';
                     var dropdownselector = document.getElementById('prediction-dropdown');
                     for (i=0; i<data['class_list'].length; i++){
                         dropdownselector.add(new Option(data['class_list'][i]));
                     }
+                    // document.getElementById('prediction-dropdown').value = '1';
                 },
                 error: notifyFail
             })
         };
         
+        // Add new option to label dropdown list and .txt file
+        var addNewLabel = function(){
+            newLabelToAdd = document.getElementById('newLabelText').value;
+            if (newLabelToAdd.toLowerCase() == 'empty'){
+                toastr.error('The provided label is already in the dropdown list.', {timeOut: 3000});
+                document.getElementById('newLabelText').value = "";
+            } else {
+                console.debug(newLabelToAdd);
+                document.getElementById('newLabelText').value = "";
+                $.ajax({
+                    type: "POST",
+                    url: urlPrefix+"addNewLabel",
+                    contentType: "application/json",
+                    data: JSON.stringify({"new_label_text": newLabelToAdd}),
+                    success: function(data){
+                        if (data['label_already_in_list']){
+                            toastr.error('The provided label is already in the dropdown list.', {timeOut: 3000});
+                        } else {
+                            $('#classification-dropdown').empty();
+                            var dropdownselector = document.getElementById('classification-dropdown');
+                            dropdownselector.add(new Option('Species...', 0, true, true));
+                            dropdownselector.add(new Option('Empty'));
+                            for (i=0; i<data['class_list'].length; i++){
+                                dropdownselector.add(new Option(data['class_list'][i]));
+                            }
+                            $('#prediction-dropdown').empty();
+                            var dropdownselector = document.getElementById('prediction-dropdown');
+                            // dropdownselector.add(new Option('Species...', 0, false, false))
+                            dropdownselector.add(new Option('All Species', 1, true, true))
+                            for (i=0; i<data['class_list'].length; i++){
+                                dropdownselector.add(new Option(data['class_list'][i]));
+                            }
+                        }
+                    },
+                    error: notifyFail
+                })
+            }
+        };
+
         // View full size source image on double click
         $(function(){
             $(".display-image").on('dblclick', function(){
@@ -528,6 +571,7 @@
         };
 
         $(document).ready(function(){
+            // alert('we are using the right index.html file')
             getClassList();
             refreshImagesToDisplay();
             selectImages();

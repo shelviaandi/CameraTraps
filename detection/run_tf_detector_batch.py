@@ -38,6 +38,8 @@ import tensorflow as tf
 import numpy as np
 import humanfriendly
 import PIL
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 from tqdm import tqdm
 import pandas as pd
 
@@ -516,7 +518,7 @@ def args_to_object(args, obj):
     
     for n, v in inspect.getmembers(args):
         if not n.startswith('_'):
-            setattr(obj, n, v);
+            setattr(obj, n, v)
 
     
 def main():
@@ -538,14 +540,14 @@ def main():
                         help='Checkpoint results to allow restoration from crash points later')
     parser.add_argument('--resumeFromCheckpoint', type=str, default=None,
                         help='Initiate inference from the specified checkpoint')
-    parser.add_argument('--outputRelativeFilenames', type=bool, action='store_true',
+    parser.add_argument('--outputRelativeFilenames', action='store_true',
                         help='Output relative file names, only meaningful if --imageFile points to a directory')
     
     if len(sys.argv[1:])==0:
         parser.print_help()
         parser.exit()
     
-    args = parser.parse_args()    
+    args = parser.parse_args()
     
     options = BatchDetectionOptions()
     args_to_object(args,options)

@@ -17,7 +17,7 @@ NOTE:
 '''
 
 import numpy as np
-import argparse, ast, csv, json, pickle, os, sys, time, tqdm, uuid
+import argparse, ast, csv, json, pickle, os, random, string, sys, time, tqdm, uuid
 from PIL import Image
 
 
@@ -42,6 +42,11 @@ def main():
     
     # store info about the crops produced in a JSON file
     crops_json = {}
+    #------------------------------------------------------------#
+    # COMMENT OUT IF NOT WORKING WITH CALTECH CAMERA TRAPS
+    #------------------------------------------------------------#
+    coco_data = json.load(open('/datadrive/cct/CaltechCameraTraps_v2.1.json', 'r'))
+    coco_image_data = {i['file_name']:i for i in coco_data['images']}
 
     with open(DETECTOR_OUTPUT, 'r') as f:
         counter = 0
@@ -55,8 +60,8 @@ def main():
             imgfile = row[0]
             #------------------------------------------------------------------------------------------------------------#
             # COMMENT OUT IF NOT USING A SPECIFIC PROJECT WITHIN ROBERT LONG EMAMMAL DATASET
-            if 'p158' not in imgfile: # this is for Washington Urban-Wildland Carnivore Project in emammal (Robert Long)
-                continue
+            # if 'p158' not in imgfile: # this is for Washington Urban-Wildland Carnivore Project in emammal (Robert Long)
+                # continue
             #------------------------------------------------------------------------------------------------------------#
             maxconf = float(row[1])
             detections = ast.literal_eval(row[2])
@@ -82,10 +87,26 @@ def main():
             # imgseqnumframes = len([name for name in os.listdir(os.path.dirname(imgfile)) if os.path.isfile(os.path.join(os.path.dirname(imgfile), name))])
             
             ## emammal:
-            imgframenum = int(os.path.basename(imgfile).split('.JPG')[0].split('i')[-1])
-            imgseqid = int(os.path.basename(imgfile).split('.JPG')[0].split('s')[-1].split('i')[0])
-            imgseqid_prefix = os.path.basename(imgfile).split('.JPG')[0].split('i')[0]
-            imgseqnumframes = len([name for name in os.listdir(os.path.dirname(imgfile)) if (os.path.isfile(os.path.join(os.path.dirname(imgfile), name)) & (imgseqid_prefix in name))])
+            # imgframenum = int(os.path.basename(imgfile).split('.JPG')[0].split('i')[-1])
+            # imgseqid = int(os.path.basename(imgfile).split('.JPG')[0].split('s')[-1].split('i')[0])
+            # imgseqid_prefix = os.path.basename(imgfile).split('.JPG')[0].split('i')[0]
+            # imgseqnumframes = len([name for name in os.listdir(os.path.dirname(imgfile)) if (os.path.isfile(os.path.join(os.path.dirname(imgfile), name)) & (imgseqid_prefix in name))])
+            
+            # ## SUCP: # probably need to get this from metadata; ignoring sequence info for now
+            # metadata = json.load(open('/datadrive/SUCP/images_metadata.json', 'r'))
+            # imgframenum = metadata[imgfile]['frame_num']#1 #int(os.path.basename(imgfile).split('.JPG')[0].split('i')[-1])
+            # imgseqid = metadata[imgfile]['seq_id']#''.join([random.choice(string.ascii_letters + string.digits) for n in range(16)])
+            # # imgseqid_prefix = os.path.basename(imgfile).split('.JPG')[0].split('i')[0]
+            # imgseqnumframes = metadata[imgfile]['seq_num_frames']#1 #len([name for name in os.listdir(os.path.dirname(imgfile)) if (os.path.isfile(os.path.join(os.path.dirname(imgfile), name)) & (imgseqid_prefix in name))])
+            
+            ## cct:
+            key = imgfile.split('/')[-1]
+            if key not in coco_image_data.keys():
+                continue
+            imgframenum = coco_image_data[key]['frame_num']#1 #int(os.path.basename(imgfile).split('.JPG')[0].split('i')[-1])
+            imgseqid = coco_image_data[key]['seq_id']#''.join([random.choice(string.ascii_letters + string.digits) for n in range(16)])
+            imgseqnumframes = coco_image_data[key]['seq_num_frames']#1 #len([name for name in os.listdir(os.path.dirname(imgfile)) if (os.path.isfile(os.path.join(os.path.dirname(imgfile), name)) & (imgseqid_prefix in name))])
+            
             #------------------------------------------------------------------------------------------------------------#
             
             for box_id in range(len(detections)):
