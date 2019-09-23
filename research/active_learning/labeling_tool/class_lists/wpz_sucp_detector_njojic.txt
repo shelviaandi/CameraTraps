@@ -1,0 +1,19 @@
+Dog
+Squirrel 
+Bait
+Racoon
+Rat
+Deer
+Bird
+Whiteout
+Fox
+Coyote 
+Restroom
+Hand Occlusion
+Rabit
+Rabbit
+Serial Killer
+Cat
+Opossum 
+Bear
+
