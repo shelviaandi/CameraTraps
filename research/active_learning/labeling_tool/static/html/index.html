@@ -14,6 +14,45 @@
     <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js"></script>
     <link href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css" rel="stylesheet"> 
     
+    <!-- User ID using Cookies -->
+    <script>
+        function setCookie(cname,cvalue,exdays){
+            var d = new Date();
+            d.setTime(d.getTime() + (exdays*24*60*60*1000));
+            var expires = "expires=" + d.toGMTString();
+            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+        }
+
+        function getCookie(cname){
+            var name = cname + "=";
+            var decodedCookie = decodeURIComponent(document.cookie);
+            var ca = decodedCookie.split(';');
+            for (var i=0; i<ca.length; i++){
+                var c = ca[i];
+                while (c.charAt(0) == ' '){
+                    c = c.substring(1);
+                }
+                if(c.indexOf(name) == 0){
+                    return c.substring(name.length, c.length);
+                }
+            }
+            return "";
+        }
+
+        function checkCookie(){
+            var user=getCookie("username");
+            if (user != ""){
+                alert("Welcome again " + user);
+            } else{
+                // user = prompt("Please enter your name:", "");
+                user = (Date.now().toString(36) + Math.random().toString(36).substr(2, 5)).toUpperCase();
+                if (user != "" && user != null){
+                    setCookie("username", user, 1);
+                }
+            }
+        }
+    </script>
+
     <style type="text/css">
         @media (min-width:576px) {
             .card-columns {
@@ -43,7 +82,7 @@
     </style>
 </head>
 
-<body>
+<body onload="checkCookie()">
     <!-- Page Content -->
     <div id="page-content-wrapper">
         <!-- Navigation bar -->
@@ -258,6 +297,9 @@
                     data: JSON.stringify({"img_src": $("#fullimage").attr("crop")}),
                     success: function(data){
                         if (data['success_status'] == true){
+                            if (data['image_sequence'].length < 2){
+                                toastr.warning("No other images from the same sequence had detections.", {timeOut: 3000})
+                            }
                             var imgSrcs = data['image_sequence'];
                             imgSrcs.push($('#fullimage').attr("src")); // add original image so when the sequence finishes we return to the original img
                             setModalImgSrc(imgSrcs, 0);
