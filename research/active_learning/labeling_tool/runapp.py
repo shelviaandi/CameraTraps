@@ -62,7 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--db_name', type=str, default='missouricameratraps', help='Name of Postgres DB with target dataset tables.')
     parser.add_argument('--db_user', type=str, default=None, help='Name of user accessing Postgres DB.')
     parser.add_argument('--db_password', type=str, default=None, help='Password of user accessing Postgres DB.')
-    parser.add_argument('--db_query_limit', default=1000, type=int, help='Maximum number of records to read from the Postgres DB.')
+    parser.add_argument('--db_query_limit', default=5000, type=int, help='Maximum number of records to read from the Postgres DB.')
     parser.add_argument('--crop_dir', type=str, required=True, help='Path to directory containing cropped images to display.')
     parser.add_argument('--class_list', type=str, required=True, help='Path to .txt file containing classes in dataset.')
     parser.add_argument('--checkpoint_dir', type=str, required=True, help='Path to directory where checkpoints will be stored.')
@@ -593,33 +593,34 @@ if __name__ == '__main__':
         data = bottle.request.json
         
         image_src = data['img_src']
-        print('Sequence query image:\n%s'%image_src)
+        # print('Sequence query image:\n%s'%image_src)
         
         matching_image_entries = (Image
                                 .select(Image.seq_id, Image.seq_num_frames, Image.frame_num)
                                 .where((Image.file_name == image_src)))
         try:
             mie = matching_image_entries.get()
-            if mie.seq_num_frames > 1:
+            if mie.seq_num_frames >= 1:
                 images_in_seq = (Image
                                 .select(Image.source_file_name)
                                 .where((Image.seq_id == mie.seq_id))
                                 .order_by(Image.frame_num))
                 image_sequence = sorted(list(set([i.source_file_name for i in images_in_seq])))
-                print('Full sequence:\n'+'\n'.join(image_sequence))
-                if len(image_sequence) > 10:
-                    minidx = max(mie.frame_num - 4, 0)
-                    maxidx = min(mie.frame_num + 4, len(image_sequence))
-                    image_sequence = image_sequence[minidx:maxidx+1]
-                data['image_sequence'] = image_sequence
-                print('Returned sequence:\n'+'\n'.join(image_sequence))
+                # print('Full sequence:\n'+'\n'.join(image_sequence))
+            if len(image_sequence) > 10:
+                minidx = max(mie.frame_num - 4, 0)
+                maxidx = min(mie.frame_num + 4, len(image_sequence))
+                image_sequence = image_sequence[minidx:maxidx+1]
+            data['image_sequence'] = image_sequence
+            # print('Returned sequence:\n'+'\n'.join(image_sequence))
             data['success_status'] = True
         except:
             data['success_status'] = False
+            print('Failure to load sequence images!')
         
         bottle.response.content_type = 'application/json'
         bottle.response.status = 200
         return json.dumps(data)
-    print('hello world')
+
     webUIapp.run(**webUIapp_server_kwargs)
     
