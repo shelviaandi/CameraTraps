@@ -33,7 +33,7 @@ for root, dirs, files in os.walk(image_dir):
         for fpidx in tqdm.tqdm(range(len(unordered_filepaths))):
             img = Image.open(unordered_filepaths[fpidx])
             datetime_str = get_PILImage_exif(img)
-            img_datetime = parse(datetime_str)
+            img_datetime = parse(str(datetime.strptime(datetime_str, '%Y:%m:%d %H:%M:%S')))
             unordered_filedatetimes.append(img_datetime)
         filedatetimes = sorted(unordered_filedatetimes)
         filepaths = [unordered_filepaths[i[0]] for i in sorted(enumerate(unordered_filedatetimes), key=lambda x:x[1])]
