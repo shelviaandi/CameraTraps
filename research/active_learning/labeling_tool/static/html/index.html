@@ -472,7 +472,7 @@
                 if (predictedLabelText != "None"){
                     $.ajax({
                         type: "POST",
-                        url: "http://lynxvm.southcentralus.cloudapp.azure.com:8080/confirmPredictedLabel",//"http://localhost:8000/confirmPredictedLabel",
+                        url: urlPrefix+"confirmPredictedLabel",//"http://localhost:8000/confirmPredictedLabel",
                         contentType: "application/json",
                         data: JSON.stringify({"image": imgid, "label": predictedLabelText, "user": getCookie('username')}),
                         success: function(data){
@@ -616,7 +616,7 @@
             toastr.info('Training classifier and updating predictions. Please wait a few seconds.', {timeOut: 3000});
             $.ajax({
                 type: "POST",
-                url: "http://lynxvm.southcentralus.cloudapp.azure.com:8080/trainClassifier",//"http://localhost:8000/trainClassifier",
+                url: urlPrefix+"trainClassifier",//"http://localhost:8000/trainClassifier",
                 contentType: "application/json",
                 data: JSON.stringify({"user": getCookie('username')}),
                 success: function(data){
