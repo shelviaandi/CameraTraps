@@ -1,0 +1,13 @@
+Coyote
+Bait
+Dog
+Raccoon
+Squirrel
+Deer
+Cat
+Rabbit
+Human
+Bird
+Rat
+Opossum
+Black Bear
