@@ -42,7 +42,7 @@
         function checkCookie(){
             var user=getCookie("username");
             if (user != ""){
-                alert("Welcome again " + user);
+                // alert("Welcome again " + user);
             } else{
                 // user = prompt("Please enter your name:", "");
                 user = (Date.now().toString(36) + Math.random().toString(36).substr(2, 5)).toUpperCase();
@@ -395,6 +395,21 @@
                     success: function(data){
                         if (data['label_already_in_list']){
                             toastr.error('The provided label is already in the dropdown list.', {timeOut: 3000});
+                            // Still refresh the dropdown lists in case a different user on the same URL added a new class
+                            $('#classification-dropdown').empty();
+                            var dropdownselector = document.getElementById('classification-dropdown');
+                            dropdownselector.add(new Option('Species...', 0, true, true));
+                            dropdownselector.add(new Option('Empty'));
+                            for (i=0; i<data['class_list'].length; i++){
+                                dropdownselector.add(new Option(data['class_list'][i]));
+                            }
+                            $('#prediction-dropdown').empty();
+                            var dropdownselector = document.getElementById('prediction-dropdown');
+                            // dropdownselector.add(new Option('Species...', 0, false, false))
+                            dropdownselector.add(new Option('All Species', 1, true, true))
+                            for (i=0; i<data['class_list'].length; i++){
+                                dropdownselector.add(new Option(data['class_list'][i]));
+                            }
                         } else {
                             $('#classification-dropdown').empty();
                             var dropdownselector = document.getElementById('classification-dropdown');
@@ -459,7 +474,7 @@
                         type: "POST",
                         url: "http://lynxvm.southcentralus.cloudapp.azure.com:8080/confirmPredictedLabel",//"http://localhost:8000/confirmPredictedLabel",
                         contentType: "application/json",
-                        data: JSON.stringify({"image": imgid, "label": predictedLabelText}),
+                        data: JSON.stringify({"image": imgid, "label": predictedLabelText, "user": getCookie('username')}),
                         success: function(data){
                             imgobj[0].classList.add("classified")
                             document.getElementById(imgtxt).style.color = "greenyellow"
@@ -585,7 +600,7 @@
                 type: "POST",
                 url: urlPrefix+"assignLabel",//"http:/104.42.168.207:8080/assignLabel",//"http://localhost:8000/assignLabel",
                 contentType: "application/json",
-                data: JSON.stringify({"images": currentlyAssigningIDs, "label": assignedLabelText}),
+                data: JSON.stringify({"images": currentlyAssigningIDs, "label": assignedLabelText, "user": getCookie('username')}),
                 success: function(data){
                     console.debug(data)
                 },
@@ -603,7 +618,7 @@
                 type: "POST",
                 url: "http://lynxvm.southcentralus.cloudapp.azure.com:8080/trainClassifier",//"http://localhost:8000/trainClassifier",
                 contentType: "application/json",
-                data: JSON.stringify({"test": "testdata"}),
+                data: JSON.stringify({"user": getCookie('username')}),
                 success: function(data){
                     toastr.success('Finished training species classifier. You can now load more images with newly predicted labels.', {timeOut: 5000});
                     classifierTrained = true;
