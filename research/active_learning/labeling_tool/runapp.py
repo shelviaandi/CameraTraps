@@ -250,6 +250,8 @@ if __name__ == '__main__':
             print('label was already in list!')
             label_already_in_list = True
             data['label_already_in_list'] = label_already_in_list
+            class_list = [cname for cname in open(args.class_list, 'r').read().splitlines()]
+            data['class_list'] = sorted(class_list)
             bottle.response.content_type = 'application/json'
             bottle.response.status = 200
             return json.dumps(data)
@@ -387,6 +389,7 @@ if __name__ == '__main__':
 
         images_to_label = [im['id'] for im in data['images']]
         label_to_assign = data['label']
+        # print(data)
 
         # Use image ids in images_to_label to get the corresponding dataset indices
         indices_to_label = []
@@ -400,6 +403,7 @@ if __name__ == '__main__':
         if label_category_name == 'empty':
             # Update records in dataset dataloader but not in the PostgreSQL database
             moveRecords(dataset, DetectionKind.ModelDetection.value, DetectionKind.UserDetection.value, indices_to_label)
+            # dataset.set_indices[4] = list(set(dataset.set_indices[4]).union(set(indices_to_label))) # add the index to the set of labeled/confirmed indices
             # numLabeled = len(dataset.set_indices[DetectionKind.UserDetection.value])
         else:
             # Get the category id for the assigned label
@@ -410,15 +414,15 @@ if __name__ == '__main__':
                 print('The label was not found in the database Category table')
                 raise NotImplementedError
             
-            # Update entries in the PostgreSQL database
-            ## get Detection table entries corresponding to the images being labeled 
-            matching_detection_entries = (Detection
-                        .select(Detection.id, Detection.category_id)
-                        .where((Detection.id << images_to_label))) # << means IN
-            ## update category_id, category_confidence, and kind of each Detection entry in the PostgreSQL database      
-            for mde in matching_detection_entries:
-                command = Detection.update(category_id=label_category_id, category_confidence=1, kind=DetectionKind.UserDetection.value).where(Detection.id == mde.id)
-                command.execute()
+            # # Update entries in the PostgreSQL database
+            # ## get Detection table entries corresponding to the images being labeled 
+            # matching_detection_entries = (Detection
+            #             .select(Detection.id, Detection.category_id)
+            #             .where((Detection.id << images_to_label))) # << means IN
+            # ## update category_id, category_confidence, and kind of each Detection entry in the PostgreSQL database      
+            # for mde in matching_detection_entries:
+            #     command = Detection.update(category_id=label_category_id, category_confidence=1, kind=DetectionKind.UserDetection.value).where(Detection.id == mde.id)
+            #     command.execute()
             
             # Update records in dataset dataloader
             for il in indices_to_label:
@@ -432,6 +436,14 @@ if __name__ == '__main__':
             dataset.set_indices[4] = list(set(dataset.set_indices[4]).union(set(indices_to_label))) # add the index to the set of labeled/confirmed indices
             # numLabeled = len(dataset.set_indices[DetectionKind.UserDetection.value])
             print([len(x) for x in dataset.set_indices])
+
+        # Log the user's input
+        with open(args.checkpoint_dir + DB_NAME + '_port' + str(args.port) + '_userinput.txt', 'a+') as f:
+            for im in images_to_label:
+                if label_category_name == 'empty':
+                    f.write(data['user']+','+im+','+label_category_name+','+str(0)+',3,'+str(time.time())+'\n')
+                else:
+                    f.write(data['user']+','+im+','+label_category_name+','+str(label_category_id)+',3,'+str(time.time())+'\n')
 
         bottle.response.content_type = 'application/json'
         bottle.response.status = 200
@@ -466,15 +478,15 @@ if __name__ == '__main__':
                 print('The label was not found in the database Category table')
                 raise NotImplementedError
             
-            # Update entries in the PostgreSQL database
-            ## get Detection table entries corresponding to the images being labeled 
-            matching_detection_entries = (Detection
-                        .select(Detection.id, Detection.category_id)
-                        .where((Detection.id==image_to_label))) # << means IN
-            ## update category_id, category_confidence, and kind of each Detection entry in the PostgreSQL database      
-            mde = matching_detection_entries.get()
-            command = Detection.update(category_id=label_category_id, category_confidence=1, kind=DetectionKind.ConfirmedDetection.value).where(Detection.id == mde.id)
-            command.execute()
+            # # Update entries in the PostgreSQL database
+            # ## get Detection table entries corresponding to the images being labeled 
+            # matching_detection_entries = (Detection
+            #             .select(Detection.id, Detection.category_id)
+            #             .where((Detection.id==image_to_label))) # << means IN
+            # ## update category_id, category_confidence, and kind of each Detection entry in the PostgreSQL database      
+            # mde = matching_detection_entries.get()
+            # command = Detection.update(category_id=label_category_id, category_confidence=1, kind=DetectionKind.ConfirmedDetection.value).where(Detection.id == mde.id)
+            # command.execute()
             
             # Update records in dataset dataloader
             sample_data = list(dataset.samples[index_to_label])
@@ -487,6 +499,13 @@ if __name__ == '__main__':
             # numLabeled = len(dataset.set_indices[DetectionKind.UserDetection.value])
             print([len(x) for x in dataset.set_indices])
         
+        # Log the user's input
+        with open(args.checkpoint_dir + DB_NAME + '_port' + str(args.port) + '_userinput.txt', 'a+') as f:
+            if label_category_name == 'empty':
+                f.write(data['user']+','+image_to_label+','+label_category_name+','+str(0)+',3,'+str(time.time())+'\n')
+            else:
+                f.write(data['user']+','+image_to_label+','+label_category_name+','+str(label_category_id)+',3,'+str(time.time())+'\n')
+
         bottle.response.content_type = 'application/json'
         bottle.response.status = 200
         return json.dumps(data)
@@ -515,7 +534,7 @@ if __name__ == '__main__':
         print('Training took %0.2f seconds'%(time.time() - timer))
 
         timer = time.time()
-        joblib.dump(kwargs["model"], "%s/%s_%04d.skmodel"%(args.checkpoint_dir, 'classifier', len(dataset.current_set)))
+        joblib.dump(kwargs["model"], "%s/%s_port%s_%04d.skmodel"%(args.checkpoint_dir, 'classifier',str(args.port), len(dataset.current_set)))
         print('Saving classifier checkpoint took %0.2f seconds'%(time.time() - timer))
 
         
@@ -563,6 +582,10 @@ if __name__ == '__main__':
             # once the classifier has been trained the first time, switch to AL sampling
             classifier_trained = True
             sampler = get_AL_sampler('confidence')(dataset.em, dataset.getalllabels(), 1234)
+        
+        # Log the user's input
+        with open(args.checkpoint_dir + DB_NAME + '_port' + str(args.port) + '_userinput.txt', 'a+') as f:
+            f.write(data['user']+'retrained the classifier\n')
 
         bottle.response.content_type = 'application/json'
         bottle.response.status = 200
