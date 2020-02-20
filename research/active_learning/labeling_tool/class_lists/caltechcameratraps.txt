@@ -1,0 +1,13 @@
+Bird
+Bobcat
+Cat
+Coyote
+Deer
+Dog
+Fox
+Opossum
+Rabbit
+Raccoon
+Rodent
+Skunk
+Squirrel
